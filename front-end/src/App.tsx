@@ -48,6 +48,9 @@ function AppContent() {
                 <Profile />
               </div>
               <BottomNav onCreatePost={() => setShowCreateModal(true)} />
+              {showCreateModal && (
+                <CreatePostModal onClose={() => setShowCreateModal(false)} />
+              )}
             </div>
           ) : (
             <Navigate to="/login" replace />
