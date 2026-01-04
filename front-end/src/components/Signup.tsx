@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LogIn } from 'lucide-react';
 
-export default function Login() {
+export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<'user' | 'admin'>('user');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -17,11 +19,14 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      // Call the signup function with all required fields
+      await signup(name, email, password, role);
+      
+      // Redirect to home/dashboard after successful signup
       navigate('/');
     } catch (err) {
-      setError('Invalid credentials. Try john@example.com or jane@example.com');
-      console.error('Login error:', err);
+      console.error('Signup error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create an account');
     } finally {
       setLoading(false);
     }
@@ -38,13 +43,27 @@ export default function Login() {
           </div>
 
           <h1 className="text-3xl font-bold text-white text-center mb-2">
-            Welcome Back
+            Create Account
           </h1>
           <p className="text-gray-400 text-center mb-8">
-            Sign in to manage complaints
+            Sign up to get started
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                placeholder="Enter your full name"
+                required
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Email
@@ -61,6 +80,32 @@ export default function Login() {
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
+                Role
+              </label>
+              <div className="flex space-x-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio h-4 w-4 text-blue-500"
+                    checked={role === 'user'}
+                    onChange={() => setRole('user')}
+                  />
+                  <span className="ml-2 text-gray-300">User</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    className="form-radio h-4 w-4 text-blue-500"
+                    checked={role === 'admin'}
+                    onChange={() => setRole('admin')}
+                  />
+                  <span className="ml-2 text-gray-300">Admin</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
                 Password
               </label>
               <input
@@ -68,7 +113,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                placeholder="Enter your password"
+                placeholder="Create a password"
                 required
               />
             </div>
@@ -84,27 +129,21 @@ export default function Login() {
               disabled={loading}
               className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Creating account...' : 'Sign Up'}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-400">
-              Don't have an account?{' '}
+              Already have an account?{' '}
               <button
                 type="button"
-                onClick={() => navigate('/signup')}
+                onClick={() => navigate('/login')}
                 className="text-blue-400 hover:text-blue-300 font-medium focus:outline-none"
               >
-                Sign up
+                Sign in
               </button>
             </p>
-          </div>
-
-          <div className="mt-4 p-4 bg-gray-800/30 rounded-xl">
-            <p className="text-xs text-gray-400 text-center mb-2">Demo accounts:</p>
-            <p className="text-xs text-gray-500 text-center">john@example.com / any password</p>
-            <p className="text-xs text-gray-500 text-center">jane@example.com / any password</p>
           </div>
         </div>
       </div>

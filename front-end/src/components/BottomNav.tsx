@@ -1,21 +1,22 @@
 import { Home, User, Plus, MapPin, Bell } from 'lucide-react';
-import { Screen } from '../types';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 
 interface BottomNavProps {
-  currentScreen: Screen;
-  onScreenChange: (screen: Screen) => void;
   onCreatePost: () => void;
 }
 
 const navItems = [
-  { id: 'feed', icon: Home, label: 'Feed' },
-  { id: 'map', icon: MapPin, label: 'Map' },
-  { id: 'notifications', icon: Bell, label: 'Alerts' },
-  { id: 'profile', icon: User, label: 'Profile' },
+  { id: 'feed', path: '/', icon: Home, label: 'Feed' },
+  { id: 'map', path: '/map', icon: MapPin, label: 'Map' },
+  { id: 'notifications', path: '/notifications', icon: Bell, label: 'Alerts' },
+  { id: 'profile', path: '/profile', icon: User, label: 'Profile' },
 ];
 
-export default function BottomNav({ currentScreen, onScreenChange, onCreatePost }: BottomNavProps) {
+export default function BottomNav({ onCreatePost }: BottomNavProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
   // Clean up any existing styles on unmount
   useEffect(() => {
     return () => {
@@ -31,13 +32,13 @@ export default function BottomNav({ currentScreen, onScreenChange, onCreatePost 
       <div className="max-w-2xl mx-auto px-6">
         <div className="flex items-center justify-between h-20 relative">
           {navItems.map((item) => {
-            const isActive = currentScreen === item.id;
             const Icon = item.icon;
+            const isActive = location.pathname === item.path;
             
             return (
               <button
                 key={item.id}
-                onClick={() => onScreenChange(item.id as Screen)}
+                onClick={() => navigate(item.path)}
                 className={`group flex flex-col items-center gap-1 p-2 rounded-xl transition-all duration-300 ${
                   isActive 
                     ? 'text-indigo-400' 
