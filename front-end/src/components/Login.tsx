@@ -18,9 +18,11 @@ export default function Login() {
 
     try {
       await login(email, password);
-      navigate('/');
+      // No need to navigate here, the ProtectedRoute will handle the redirect
+      // based on the isAuthenticated state
     } catch (err) {
-      setError('Invalid credentials. Try john@example.com or jane@example.com');
+      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(errorMessage);
       console.error('Login error:', err);
     } finally {
       setLoading(false);
@@ -102,9 +104,16 @@ export default function Login() {
           </div>
 
           <div className="mt-4 p-4 bg-gray-800/30 rounded-xl">
-            <p className="text-xs text-gray-400 text-center mb-2">Demo accounts:</p>
-            <p className="text-xs text-gray-500 text-center">john@example.com / any password</p>
-            <p className="text-xs text-gray-500 text-center">jane@example.com / any password</p>
+            <p className="text-xs text-gray-400 text-center">
+              Don't have an account?{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/signup')}
+                className="text-blue-400 hover:text-blue-300 font-medium focus:outline-none"
+              >
+                Sign up
+              </button>
+            </p>
           </div>
         </div>
       </div>

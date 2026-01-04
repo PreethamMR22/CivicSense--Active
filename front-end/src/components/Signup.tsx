@@ -7,7 +7,6 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<'user' | 'admin'>('user');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
@@ -18,15 +17,21 @@ export default function Signup() {
     setError('');
     setLoading(true);
 
+    // Basic validation
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Call the signup function with all required fields
-      await signup(name, email, password, role);
-      
-      // Redirect to home/dashboard after successful signup
-      navigate('/');
+      await signup(name, email, password, 'user');
+      // No need to navigate here, the ProtectedRoute will handle the redirect
+      // based on the isAuthenticated state
     } catch (err) {
       console.error('Signup error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create an account');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create an account. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -78,31 +83,8 @@ export default function Signup() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Role
-              </label>
-              <div className="flex space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    className="form-radio h-4 w-4 text-blue-500"
-                    checked={role === 'user'}
-                    onChange={() => setRole('user')}
-                  />
-                  <span className="ml-2 text-gray-300">User</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    className="form-radio h-4 w-4 text-blue-500"
-                    checked={role === 'admin'}
-                    onChange={() => setRole('admin')}
-                  />
-                  <span className="ml-2 text-gray-300">Admin</span>
-                </label>
-              </div>
-            </div>
+            {/* Role selection removed - default to 'user' for all new signups */}
+            <input type="hidden" name="role" value="user" />
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">

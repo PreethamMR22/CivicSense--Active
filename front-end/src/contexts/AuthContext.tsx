@@ -1,118 +1,163 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiRequest } from '../utils/api';
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (name: string, email: string, password: string, role: 'user' | 'admin') => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
 }
 
 export interface User {
-  id: string;
+  _id: string;
   email: string;
   name: string;
-  avatar: string;
   role: 'user' | 'admin';
+  avatar?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const dummyUsers: User[] = [
-  {
-    id: '1',
-    email: 'john@example.com',
-    name: 'John Doe',
-    avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=200',
-    role: 'user' as const
-  },
-  {
-    id: '2',
-    email: 'jane@example.com',
-    name: 'Jane Smith',
-    avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200',
-    role: 'admin' as const
-  }
-];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await apiRequest<{ token: string; user: User }>('/auth/login', 'POST', {
+        email,
+        password,
+      }, false);
 
-      const foundUser = [...dummyUsers, ...(JSON.parse(localStorage.getItem('users') || '[]') as User[])].find(u => u.email === email);
-      if (foundUser && password) {
-        setUser(foundUser);
-      } else {
-        throw new Error('Invalid credentials');
+      if (!response.success) {
+        throw new Error(response.error || 'Login failed');
       }
+
+      const { token, user } = response;
+      
+      if (!token || !user) {
+        throw new Error('Invalid response from server');
+      }
+      
+      // Store token in localStorage
+      localStorage.setItem('token', token);
+      
+      // Set user in state and mark as authenticated
+      setUser({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`
+      });
+      
+      setIsAuthenticated(true);
+      return user;
+    } catch (error) {
+      console.error('Login error:', error);
+      localStorage.removeItem('token');
+      setUser(null);
+      setIsAuthenticated(false);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const signup = async (name: string, email: string, _password: string, role: 'user' | 'admin') => {
+  const signup = async (name: string, email: string, password: string, role: 'user' | 'admin') => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Check if user already exists
-      const users = JSON.parse(localStorage.getItem('users') || '[]') as User[];
-      if (users.some(u => u.email === email)) {
-        throw new Error('Email already in use');
-      }
-      
-      // Create new user
-      const newUser: User = {
-        id: Math.random().toString(36).substr(2, 9),
+      const response = await apiRequest<{ token: string; user: User }>('/auth/register', 'POST', {
         name,
         email,
-        role,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
-      };
+        password,
+        role
+      }, false);
+
+      if (!response.success) {
+        throw new Error(response.error || 'Registration failed');
+      }
+
+      const { token, user } = response;
       
-      // Save to local storage (in a real app, this would be an API call)
-      localStorage.setItem('users', JSON.stringify([...users, newUser]));
+      if (!token || !user) {
+        throw new Error('Invalid response from server');
+      }
       
-      // Log the user in
-      setUser(newUser);
+      // Store token in localStorage
+      localStorage.setItem('token', token);
+      
+      // Set user in state and mark as authenticated
+      setUser({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`
+      });
+      
+      setIsAuthenticated(true);
+      return user;
+    } catch (error) {
+      console.error('Signup error:', error);
+      localStorage.removeItem('token');
+      setUser(null);
+      setIsAuthenticated(false);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = () => {
-    // BACKEND API INTEGRATION POINT
-    // POST /api/auth/logout
-    setUser(null);
+  const logout = async () => {
+    try {
+      await apiRequest('/auth/logout', 'GET');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear user data and authentication state
+      localStorage.removeItem('token');
+      setUser(null);
+      setIsAuthenticated(false);
+      setLoading(false);
+    }
   };
 
-  // Set initial loading to false after first render
+  // Check for existing token on initial load
   useEffect(() => {
-    // Simulate checking if user is logged in
     const checkAuth = async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const response = await apiRequest<{ user: User }>('/auth/me', 'GET');
+          if (response.success && response.data) {
+            const user = response.data.user;
+            setUser({
+              _id: user._id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`
+            });
+            setIsAuthenticated(true);
+          }
+        } catch (error) {
+          console.error('Auth check failed:', error);
+          localStorage.removeItem('token');
+        }
+      }
       setLoading(false);
     };
+
     checkAuth();
   }, []);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      signup,
-      logout,
-      isAuthenticated: !!user,
-      loading
-    }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, isAuthenticated, loading }}>
       {children}
     </AuthContext.Provider>
   );
