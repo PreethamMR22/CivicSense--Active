@@ -26,13 +26,16 @@ export async function apiRequest<T = any>(
     const token = localStorage.getItem('token');
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    } else if (includeAuth) {
+      // If auth is required but no token is found, reject immediately
+      throw new Error('No authentication token found');
     }
   }
 
   const config: RequestInit = {
     method,
     headers,
-    credentials: 'include', // Important for cookies
+    credentials: 'include',
     mode: 'cors',
     cache: 'no-cache',
   };
@@ -44,6 +47,13 @@ export async function apiRequest<T = any>(
   try {
     console.log(`Making ${method} request to ${url}`, { data });
     const response = await fetch(url, config);
+    
+    // Handle 401 Unauthorized
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      throw new Error('Session expired. Please log in again.');
+    }
     
     // Parse response data
     let responseData;
@@ -67,6 +77,15 @@ export async function apiRequest<T = any>(
     if (responseData.token) {
       localStorage.setItem('token', responseData.token);
       console.log('Token stored in localStorage');
+    }
+
+    // For the /auth/me endpoint, we need to return the user data directly
+    if (endpoint === '/auth/me') {
+      return {
+        success: true,
+        ...responseData,
+        user: responseData.data // Map data to user for consistency
+      };
     }
 
     return {

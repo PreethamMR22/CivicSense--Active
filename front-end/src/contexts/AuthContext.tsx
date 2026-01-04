@@ -3,8 +3,8 @@ import { apiRequest } from '../utils/api';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string, role: 'user' | 'admin') => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
+  signup: (name: string, email: string, password: string, role: 'user' | 'admin') => Promise<User>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
@@ -18,6 +18,30 @@ export interface User {
   avatar?: string;
 }
 
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  error?: string;
+  message?: string;
+  user?: T;
+  token?: string;
+}
+
+interface UserData {
+  _id: string;
+  name: string;
+  email: string;
+  role: 'user' | 'admin';
+  avatar?: string;
+}
+
+type AuthMeResponse = UserData;
+
+interface LoginResponse {
+  token: string;
+  user: UserData;
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -25,10 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User> => {
     setLoading(true);
     try {
-      const response = await apiRequest<{ token: string; user: User }>('/auth/login', 'POST', {
+      const response = await apiRequest<LoginResponse>('/auth/login', 'POST', {
         email,
         password,
       }, false);
@@ -46,17 +70,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Store token in localStorage
       localStorage.setItem('token', token);
       
-      // Set user in state and mark as authenticated
-      setUser({
+      const userData = {
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`
-      });
+      };
       
+      // Set user in state and mark as authenticated
+      setUser(userData);
       setIsAuthenticated(true);
-      return user;
+      
+      return userData;
     } catch (error) {
       console.error('Login error:', error);
       localStorage.removeItem('token');
@@ -129,31 +155,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check for existing token on initial load
   useEffect(() => {
+    let isMounted = true;
+    
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const response = await apiRequest<{ user: User }>('/auth/me', 'GET');
-          if (response.success && response.data) {
-            const user = response.data.user;
-            setUser({
-              _id: user._id,
-              name: user.name,
-              email: user.email,
-              role: user.role,
-              avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`
-            });
-            setIsAuthenticated(true);
+      
+      if (!token) {
+        if (isMounted) {
+          setUser(null);
+          setIsAuthenticated(false);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const response = await apiRequest<ApiResponse<AuthMeResponse>>('/auth/me', 'GET');
+        
+        if (!isMounted) return;
+        
+        // Log the response to debug
+        console.log('Auth response:', response);
+        
+        // Try to get user data from different possible response structures
+        const userData = response.user || response.data;
+        
+        if (response.success && userData) {
+          const { _id, name, email, role, avatar } = userData;
+          
+          if (!_id || !name || !email || !role) {
+            throw new Error('Incomplete user data received');
           }
-        } catch (error) {
-          console.error('Auth check failed:', error);
+          
+          setUser({
+            _id,
+            name,
+            email,
+            role,
+            avatar: avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
+          });
+          setIsAuthenticated(true);
+        } else {
+          throw new Error(response.error || 'Invalid user data received');
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        if (isMounted) {
           localStorage.removeItem('token');
+          setUser(null);
+          setIsAuthenticated(false);
+          // Only redirect if we're not already on the login page
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
         }
       }
-      setLoading(false);
+      
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
     checkAuth();
+    
+    // Cleanup function to prevent state updates if component unmounts
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (
