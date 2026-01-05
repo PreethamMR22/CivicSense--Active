@@ -47,6 +47,25 @@ export interface SinglePostResponse {
   error?: string;
 }
 
+// Response type for adding a comment
+export interface AddCommentResponse {
+  success: boolean;
+  data?: any;
+  message?: string;
+  error?: string;
+}
+
+// Response type for creating a post
+export interface CreatePostData {
+  description: string;
+  category: string;
+  location: string;
+  tags: string;
+  image?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 export const getPosts = async (): Promise<PostsListResponse> => {
   try {
     const response = await apiRequest<{ data: Post[]; count: number }>('/posts', 'GET', null, false);
@@ -115,14 +134,6 @@ export const upvotePost = async (postId: string): Promise<ApiResponse> => {
   }
 };
 
-// Response type for adding a comment
-export interface AddCommentResponse {
-  success: boolean;
-  data?: any;
-  message?: string;
-  error?: string;
-}
-
 export const addComment = async (postId: string, content: string): Promise<AddCommentResponse> => {
   try {
     const response = await apiRequest<{ comment: any }>(
@@ -131,17 +142,62 @@ export const addComment = async (postId: string, content: string): Promise<AddCo
       { content }
     );
     
-    return {
-      success: true,
-      data: response?.data?.comment,
-      message: response?.message || 'Comment added successfully'
-    };
+    if (response.success) {
+      return {
+        success: true,
+        data: response.data,
+        message: response.message
+      };
+    } else {
+      return {
+        success: false,
+        error: response.error || 'Failed to add comment',
+        message: response.message
+      };
+    }
   } catch (error) {
     console.error('Error adding comment:', error);
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'Failed to add comment',
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    return {
+      success: false,
+      error: 'An error occurred while adding the comment',
+      message: 'An unexpected error occurred'
+    };
+  }
+};
+
+export const createPost = async (postData: CreatePostData): Promise<SinglePostResponse> => {
+  try {
+    const response = await apiRequest<Post>(
+      '/posts',
+      'POST',
+      {
+        ...postData,
+        // Ensure tags is a string as expected by the backend
+        tags: postData.tags
+      }
+    );
+
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: response.data,
+        message: 'Post created successfully'
+      };
+    } else {
+      return {
+        success: false,
+        data: {} as Post, // Provide a default empty Post object
+        error: response.error || 'Failed to create post',
+        message: response.message
+      };
+    }
+  } catch (error) {
+    console.error('Error creating post:', error);
+    return {
+      success: false,
+      data: {} as Post, // Provide a default empty Post object
+      error: 'An error occurred while creating the post',
+      message: 'An unexpected error occurred'
     };
   }
 };

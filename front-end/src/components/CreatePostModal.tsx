@@ -83,7 +83,7 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
     }
 
     setIsLocating(true);
-    try {
+    try { 
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject);
       });
@@ -112,29 +112,31 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!user) return;
 
-    const locationText = location.isLocated 
-      ? `${location.address} (${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)})`
-      : location.address || 'Location not specified';
+    // Format location as "latitude,longitude" if available, otherwise use the address
+    const locationString = location.isLocated
+      ? `${location.latitude},${location.longitude}`
+      : location.address || '';
 
-    addPost({
-      userId: user.id,
-      userName: user.name,
-      userAvatar: user.avatar,
-      description,
-      imageUrl: imagePreview || undefined,
-      tags: tags.split(',').map(tag => tag.trim()).filter(Boolean),
-      category: category || 'Other',
-      location: locationText,
-      latitude: location.isLocated ? location.latitude : undefined,
-      longitude: location.isLocated ? location.longitude : undefined
-    });
-
-    onClose();
+    try {
+      await addPost({
+        userId: user._id,  // Changed from user.id to user._id
+        userName: user.name,
+        description,
+        image: imagePreview || '',
+        tags: tags.split(',').map(tag => tag.trim()).filter(Boolean),
+        category: category || 'Other',
+        location: locationString,
+      });
+      onClose();
+    } catch (error) {
+      console.error('Failed to create post:', error);
+      // You might want to show an error message to the user here
+    }
   };
 
   return (

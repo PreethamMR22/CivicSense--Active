@@ -90,21 +90,8 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-400">
-              Don't have an account?{' '}
-              <button
-                type="button"
-                onClick={() => navigate('/signup')}
-                className="text-blue-400 hover:text-blue-300 font-medium focus:outline-none"
-              >
-                Sign up
-              </button>
-            </p>
-          </div>
-
-          <div className="mt-4 p-4 bg-gray-800/30 rounded-xl">
-            <p className="text-xs text-gray-400 text-center">
+          <div className="mt-6 p-4 bg-gray-800/30 rounded-xl">
+            <p className="text-sm text-gray-400 text-center">
               Don't have an account?{' '}
               <button
                 type="button"

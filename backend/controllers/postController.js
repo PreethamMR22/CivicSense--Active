@@ -39,6 +39,7 @@ export const createPost = async (req, res) => {
           folder: 'posts',
           resource_type: 'auto'
         });
+        
         finalImageUrl = result.secure_url;
       } catch (uploadError) {
         console.error('Error uploading image:', uploadError);

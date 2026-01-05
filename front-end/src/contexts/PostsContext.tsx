@@ -1,10 +1,20 @@
-import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { Post, Comment } from '../types';
-import { getPosts, getPostsByUser, upvotePost as apiUpvotePost, addComment as apiAddComment } from '../services/postService';
+import { getPosts, upvotePost as apiUpvotePost, addComment as apiAddComment, createPost, Post as APIPost } from '../services/postService';
 
 interface PostsContextType {
   posts: Post[];
-  addPost: (post: Omit<Post, 'id' | 'upvotes' | 'upvotedBy' | 'comments' | 'createdAt'>) => void;
+  addPost: (postData: {
+    userId: string;
+    userName: string;
+    description: string;
+    image?: string;
+    tags: string | string[];
+    category?: string;
+    location?: string;
+    latitude?: number;
+    longitude?: number;
+  }) => Promise<{ success: boolean; post?: Post; error?: string }>;
   upvotePost: (postId: string, userId: string) => void;
   addComment: (postId: string, comment: Omit<Comment, 'id' | 'createdAt'>) => void;
   getUserPosts: (userId: string) => Post[];
@@ -66,22 +76,58 @@ export function PostsProvider({ children }: { children: ReactNode }) {
     fetchPosts();
   }, []);
 
-  const addPost = (postData: Omit<Post, 'id' | 'upvotes' | 'upvotedBy' | 'comments' | 'createdAt'>) => {
-    // BACKEND API INTEGRATION POINT
-    // POST /api/posts
-    // Body: postData
-    // Response: { post: Post }
+  const addPost = async (postData: {
+    userId: string;
+    userName: string;
+    description: string;
+    image?: string;
+    tags: string | string[];
+    category?: string;
+    location?: string;
+    latitude?: number;
+    longitude?: number;
+  }) => {
+    try {
+      const { userId, userName, ...postPayload } = postData;
+      
+      const response = await createPost({
+        ...postPayload,
+        description: postData.description,
+        category: postData.category || 'Other',
+        location: postData.location || 'Location not specified',
+        tags: Array.isArray(postData.tags) ? postData.tags.join(',') : (postData.tags || ''),
+        image: postData.image || '',
+        latitude: postData.latitude,
+        longitude: postData.longitude
+      });
 
-    const newPost: Post = {
-      ...postData,
-      id: Date.now().toString(),
-      upvotes: 0,
-      upvotedBy: [],
-      comments: [],
-      createdAt: new Date()
-    };
-
-    setPosts(prevPosts => [newPost, ...prevPosts]);
+      if (response.success && response.data) {
+        const newPost: Post = {
+          id: response.data._id,
+          userId: userId,
+          userName: userName,
+          userAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`,
+          description: response.data.description,
+          imageUrl: response.data.image || '',
+          tags: response.data.tags || [],
+          category: response.data.category || 'Other',
+          location: response.data.location || 'Location not specified',
+          upvotes: 0,
+          upvotedBy: [],
+          comments: [],
+          createdAt: new Date()
+        };
+        
+        setPosts(prevPosts => [newPost, ...prevPosts]);
+        return { success: true, post: newPost };
+      } else {
+        console.error('Failed to create post:', response.error);
+        return { success: false, error: response.error || 'Failed to create post' };
+      }
+    } catch (error) {
+      console.error('Error creating post:', error);
+      return { success: false, error: 'An error occurred while creating the post' };
+    }
   };
 
   const upvotePost = async (postId: string, userId: string) => {
