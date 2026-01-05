@@ -8,30 +8,24 @@ const postSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: true
+    default: ''
   },
   description: {
     type: String,
-    required: true
+    required: [true, 'Description is required']
   },
   location: {
     type: String,
-    required: true
+    default: ''
   },
-  latitude: {
-    type: Number,
-    required: true
-  },
-  longitude: {
-    type: Number,
-    required: true
-  },
+  latitude: Number,
+  longitude: Number,
   tags: [{
     type: String
   }],
   image: {
     type: String,
-    required: true
+    default: ''
   }
 }, { timestamps: true });
 
