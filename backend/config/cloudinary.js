@@ -4,9 +4,9 @@ import multer from 'multer';
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: 'preethamcloud',
+  api_key: '829628581851215',
+  api_secret: 'baPDATn30mz0zwm_ntnff6yNzaU'
 });
 
 // Create storage engine for multer

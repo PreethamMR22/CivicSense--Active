@@ -13,8 +13,7 @@ export const createPost = async (req, res) => {
       location = '', 
       tags = '', 
       latitude, 
-      longitude, 
-      image: imageUrl 
+      longitude
     } = req.body;
     
     // Log the incoming request body for debugging
@@ -28,22 +27,54 @@ export const createPost = async (req, res) => {
       });
     }
 
-    // Use the image URL from the request body if provided
-    // or use the uploaded file's URL if a file was uploaded
-    let finalImageUrl = imageUrl || '';
+    // Initialize image URL
+    let finalImageUrl = '';
 
-    // Process image if file is uploaded
-    if (req.file) {
+    // Process image if image data is provided in the request
+    if (req.body.image) {
+      try {
+        // Check if it's a base64 string
+        if (req.body.image.startsWith('data:image')) {
+          const result = await cloudinary.uploader.upload(req.body.image, {
+            folder: 'posts',
+            resource_type: 'auto',
+            transformation: [
+              { width: 1000, height: 1000, crop: 'limit' },
+              { quality: 'auto:good' }
+            ]
+          });
+          finalImageUrl = result.secure_url;
+        } else {
+          // If it's already a URL, use it directly
+          finalImageUrl = req.body.image;
+        }
+      } catch (uploadError) {
+        console.error('Error uploading image to Cloudinary:', uploadError);
+        return res.status(500).json({
+          success: false,
+          message: 'Error processing image',
+          error: uploadError.message
+        });
+      }
+    } else if (req.file) {
+      // Fallback to file upload if no image in request body
       try {
         const result = await cloudinary.uploader.upload(req.file.path, {
           folder: 'posts',
-          resource_type: 'auto'
+          resource_type: 'auto',
+          transformation: [
+            { width: 1000, height: 1000, crop: 'limit' },
+            { quality: 'auto:good' }
+          ]
         });
-        
         finalImageUrl = result.secure_url;
       } catch (uploadError) {
-        console.error('Error uploading image:', uploadError);
-        // Continue with the provided URL if upload fails
+        console.error('Error uploading file to Cloudinary:', uploadError);
+        return res.status(500).json({
+          success: false,
+          message: 'Error uploading file',
+          error: uploadError.message
+        });
       }
     }
 
