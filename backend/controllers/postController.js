@@ -1,23 +1,35 @@
 import Post from '../models/Post.js';
 import { cloudinary } from '../config/cloudinary.js';
+import { promisify } from 'util';
+import stream from 'stream';
+import streamifier from 'streamifier';
 
 // @desc    Create a new post
 // @route   POST /api/posts
 // @access  Private
+// Promisify the pipeline function
+const pipeline = promisify(stream.pipeline);
+
 export const createPost = async (req, res) => {
   try {
-    // Get all fields from request body
+    // Get all fields from request body or form-data
     const { 
       description, 
-      category = '', 
+      category = 'Other', 
       location = '', 
-      tags = '', 
-      latitude, 
-      longitude
+      tags = '',
+      userId,
+      userName
     } = req.body;
     
-    // Log the incoming request body for debugging
+    // Log the incoming request for debugging
+    console.log('Request received - Content-Type:', req.get('Content-Type'));
     console.log('Request body:', JSON.stringify(req.body, null, 2));
+    console.log('File received:', req.file ? {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    } : 'No file');
     
     // Validate required fields
     if (!description) {
@@ -30,36 +42,14 @@ export const createPost = async (req, res) => {
     // Initialize image URL
     let finalImageUrl = '';
 
-    // Process image if image data is provided in the request
-    if (req.body.image) {
+    // Process image if file is uploaded
+    if (req.file) {
       try {
-        // Check if it's a base64 string
-        if (req.body.image.startsWith('data:image')) {
-          const result = await cloudinary.uploader.upload(req.body.image, {
-            folder: 'posts',
-            resource_type: 'auto',
-            transformation: [
-              { width: 1000, height: 1000, crop: 'limit' },
-              { quality: 'auto:good' }
-            ]
-          });
-          finalImageUrl = result.secure_url;
-        } else {
-          // If it's already a URL, use it directly
-          finalImageUrl = req.body.image;
-        }
-      } catch (uploadError) {
-        console.error('Error uploading image to Cloudinary:', uploadError);
-        return res.status(500).json({
-          success: false,
-          message: 'Error processing image',
-          error: uploadError.message
-        });
-      }
-    } else if (req.file) {
-      // Fallback to file upload if no image in request body
-      try {
-        const result = await cloudinary.uploader.upload(req.file.path, {
+        // Convert buffer to base64 for Cloudinary
+        const base64Data = req.file.buffer.toString('base64');
+        const dataUri = `data:${req.file.mimetype};base64,${base64Data}`;
+        
+        const result = await cloudinary.uploader.upload(dataUri, {
           folder: 'posts',
           resource_type: 'auto',
           transformation: [
@@ -67,52 +57,50 @@ export const createPost = async (req, res) => {
             { quality: 'auto:good' }
           ]
         });
+        
         finalImageUrl = result.secure_url;
-      } catch (uploadError) {
-        console.error('Error uploading file to Cloudinary:', uploadError);
+        console.log('Image uploaded successfully:', finalImageUrl);
+      } catch (error) {
+        console.error('Error uploading image to Cloudinary:', error);
         return res.status(500).json({
           success: false,
-          message: 'Error uploading file',
-          error: uploadError.message
+          message: 'Error uploading image',
+          error: error.message
         });
       }
     }
 
     // Process tags
-    const tagsArray = typeof tags === 'string' && tags.trim() !== '' 
-      ? tags.split(',').map(tag => tag.trim())
-      : [];
+    const tagsArray = typeof tags === 'string' 
+      ? tags.split(',').map(tag => tag.trim()).filter(Boolean)
+      : Array.isArray(tags) 
+        ? tags.map(tag => typeof tag === 'string' ? tag.trim() : '').filter(Boolean)
+        : [];
 
-    // Create new post with all fields
+    // Create post data object
     const postData = {
-      user: req.user.id,
+      user: userId,
+      userName,
       description,
-      ...(category && { category }),
-      ...(location && { location }),
+      category,
+      location,
       ...(finalImageUrl && { image: finalImageUrl }),
-      ...(latitude && { latitude: parseFloat(latitude) }),
-      ...(longitude && { longitude: parseFloat(longitude) }),
-      ...(tagsArray.length > 0 && { tags: tagsArray })
+      tags: tagsArray
     };
     
     // Log the data being saved for debugging
     console.log('Saving post with data:', JSON.stringify(postData, null, 2));
-    
-    // Ensure the image field is always included, even if empty
-    if (!postData.image) {
-      postData.image = '';
-    }
 
     const post = await Post.create(postData);
     
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: post
     });
 
   } catch (error) {
     console.error('Error creating post:', error);
-    res.status(500).json({ 
+    return res.status(500).json({
       success: false,
       message: 'Server error',
       error: error.message

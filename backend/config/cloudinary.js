@@ -1,5 +1,4 @@
 import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import multer from 'multer';
 
 // Configure Cloudinary
@@ -9,15 +8,8 @@ cloudinary.config({
   api_secret: 'baPDATn30mz0zwm_ntnff6yNzaU'
 });
 
-// Create storage engine for multer
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'posts',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif'],
-    transformation: [{ width: 1000, height: 1000, crop: 'limit' }]
-  }
-});
+// Configure multer to use memory storage
+const storage = multer.memoryStorage();
 
 // Create multer upload instance
 const upload = multer({ 

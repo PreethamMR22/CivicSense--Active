@@ -52,7 +52,7 @@ const Map = () => {
     } else {
       setError('Geolocation is not supported by your browser');
       // Fallback to a default location
-      setPosition([12.9716, 77.5946]); // Default to a known location
+      setPosition([39.9716, 77.5946]); // Default to a known location
     }
   }, []);
 

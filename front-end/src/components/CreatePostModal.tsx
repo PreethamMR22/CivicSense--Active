@@ -65,16 +65,6 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
     }
   ] as const;
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const getCurrentLocation = async () => {
     if (!navigator.geolocation) {
@@ -114,28 +104,63 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!user) return;
 
-    // Format location as "latitude,longitude" if available, otherwise use the address
-    const locationString = location.isLocated
-      ? `${location.latitude},${location.longitude}`
-      : location.address || '';
-
     try {
-      await addPost({
-        userId: user._id,  // Changed from user.id to user._id
-        userName: user.name,
-        description,
-        image: imagePreview || '',
-        tags: tags.split(',').map(tag => tag.trim()).filter(Boolean),
-        category: category || 'Other',
-        location: locationString,
+      const formData = new FormData();
+      
+      // Add text fields
+      formData.append('userId', user._id);
+      formData.append('userName', user.name);
+      formData.append('description', description);
+      formData.append('category', category || 'Other');
+      formData.append('location', location.isLocated 
+        ? `${location.latitude},${location.longitude}` 
+        : location.address || '');
+      formData.append('tags', tags.split(',').map(tag => tag.trim()).filter(Boolean).join(','));
+      
+      // Add image file if available
+      const fileInput = document.getElementById('image-upload') as HTMLInputElement;
+      if (fileInput.files && fileInput.files[0]) {
+        formData.append('image', fileInput.files[0]);
+      }
+
+      const response = await fetch('http://localhost:5000/api/posts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          // Don't set Content-Type header - let the browser set it with the correct boundary
+        },
+        body: formData
       });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create post');
+      }
+
+      // Refresh posts and close modal
+      if (addPost) {
+        await addPost(data.data);
+      }
       onClose();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to create post:', error);
-      // You might want to show an error message to the user here
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create post. Please try again.';
+      alert(errorMessage);
+    }
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // For preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -284,35 +309,52 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
             />
           </div>
 
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
-              <ImageIcon className="w-4 h-4" />
-              Image
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-300">
+              Add Image (Optional)
             </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="hidden"
-              id="image-upload"
-            />
-            <label
-              htmlFor="image-upload"
-              className="flex items-center justify-center w-full px-4 py-8 bg-gray-800/30 border-2 border-dashed border-gray-700 rounded-xl cursor-pointer hover:bg-gray-800/50 transition-all"
-            >
-              {imagePreview ? (
+            <div className="flex items-center justify-center w-full">
+              <label
+                htmlFor="image-upload"
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-800 border-gray-700 hover:bg-gray-800/50 transition-colors"
+              >
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                  <ImageIcon className="w-8 h-8 mb-2 text-gray-400" />
+                  <p className="text-sm text-gray-400">
+                    <span className="text-blue-500 hover:underline">Click to upload</span> or drag and drop
+                  </p>
+                  <p className="text-xs text-gray-500">PNG, JPG, GIF (max. 5MB)</p>
+                </div>
+                <input
+                  id="image-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            {imagePreview && (
+              <div className="mt-2 relative">
                 <img
                   src={imagePreview}
                   alt="Preview"
-                  className="max-h-48 rounded-lg object-cover"
+                  className="w-full max-h-48 rounded-lg object-cover"
                 />
-              ) : (
-                <div className="text-center">
-                  <ImageIcon className="w-12 h-12 text-gray-600 mx-auto mb-2" />
-                  <p className="text-gray-400 text-sm">Click to upload an image</p>
-                </div>
-              )}
-            </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImagePreview('');
+                    const fileInput = document.getElementById('image-upload') as HTMLInputElement;
+                    if (fileInput) fileInput.value = '';
+                  }}
+                  className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 transition-colors"
+                  title="Remove image"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">
