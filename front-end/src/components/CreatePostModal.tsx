@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { X, Image as ImageIcon, MapPin, Tag, Folder } from 'lucide-react';
+import { X, Image as ImageIcon, MapPin, Tag, Folder, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePosts } from '../contexts/PostsContext';
-import axios from 'axios';
+import { categorizePost } from '../utils/gemini';
 
 interface CreatePostModalProps {
   onClose: () => void;
@@ -25,6 +25,7 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualLat, setManualLat] = useState('');
   const [manualLng, setManualLng] = useState('');
+  const [isCategorizing, setIsCategorizing] = useState(false);
 
   const categories = [
     {
@@ -172,6 +173,24 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
     setManualLng('');
   };
 
+  const handleAutoCategorize = async () => {
+    if (!description.trim()) {
+      alert('Please enter a description first');
+      return;
+    }
+
+    setIsCategorizing(true);
+    try {
+      const category = await categorizePost(description);
+      setCategory(category);
+    } catch (error) {
+      console.error('Auto-categorization failed:', error);
+      alert(error instanceof Error ? error.message : 'Failed to auto-categorize. Please select a category manually.');
+    } finally {
+      setIsCategorizing(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -280,10 +299,25 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
-              <Folder className="w-4 h-4" />
-              Category *
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                <Folder className="w-4 h-4" />
+                Category *
+              </label>
+              <button
+                type="button"
+                onClick={handleAutoCategorize}
+                disabled={isCategorizing || !description.trim()}
+                className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors ${
+                  isCategorizing || !description.trim()
+                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                {isCategorizing ? 'Categorizing...' : 'Auto Categorize'}
+              </button>
+            </div>
             <div className="relative">
               <select
                 value={category}
