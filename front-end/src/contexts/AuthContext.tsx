@@ -67,8 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Invalid response from server');
       }
       
-      // Store token in localStorage
+      // Store token and user data in localStorage
       localStorage.setItem('token', token);
+      localStorage.setItem('userEmail', user.email);
       
       const userData = {
         _id: user._id,
@@ -85,7 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return userData;
     } catch (error) {
       console.error('Login error:', error);
+      // Clear all auth-related data from localStorage
       localStorage.removeItem('token');
+      localStorage.removeItem('userEmail');
       setUser(null);
       setIsAuthenticated(false);
       throw error;
@@ -130,7 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return user;
     } catch (error) {
       console.error('Signup error:', error);
+      // Clear all auth-related data from localStorage
       localStorage.removeItem('token');
+      localStorage.removeItem('userEmail');
       setUser(null);
       setIsAuthenticated(false);
       throw error;
@@ -146,7 +151,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Logout error:', error);
     } finally {
       // Clear user data and authentication state
+      // Clear all auth-related data from localStorage
       localStorage.removeItem('token');
+      localStorage.removeItem('userEmail');
       setUser(null);
       setIsAuthenticated(false);
       setLoading(false);
@@ -159,16 +166,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
+      const userEmail = localStorage.getItem('userEmail');
       
       if (!token) {
-        if (isMounted) {
-          setUser(null);
-          setIsAuthenticated(false);
-          setLoading(false);
-        }
+        // Clear any stored user data if no token exists
+        localStorage.removeItem('userEmail');
+        setLoading(false);
         return;
       }
-
+      
+      if (!userEmail) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setLoading(false);
+        return;
+      }
+      
       try {
         const response = await apiRequest<ApiResponse<AuthMeResponse>>('/auth/me', 'GET');
         

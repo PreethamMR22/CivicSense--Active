@@ -130,59 +130,45 @@ export function PostsProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const upvotePost = async (postId: string, userId: string) => {
-    try {
-      const response = await apiUpvotePost(postId);
-      if (response.success) {
-        setPosts(prevPosts =>
-          prevPosts.map(post => {
-            if (post.id === postId) {
-              const isUpvoted = post.upvotedBy.includes(userId);
-              return {
-                ...post,
-                upvotes: isUpvoted ? post.upvotes - 1 : post.upvotes + 1,
-                upvotedBy: isUpvoted
-                  ? post.upvotedBy.filter(id => id !== userId)
-                  : [...post.upvotedBy, userId]
-              };
-            }
-            return post;
-          })
-        );
-      }
-    } catch (error) {
-      console.error('Error upvoting post:', error);
-    }
+  const upvotePost = (postId: string, userId: string) => {
+    setPosts(prevPosts =>
+      prevPosts.map(post => {
+        if (post.id === postId) {
+          const hasUpvoted = post.upvotedBy.includes(userId);
+          return {
+            ...post,
+            upvotes: hasUpvoted ? post.upvotes - 1 : post.upvotes + 1,
+            upvotedBy: hasUpvoted 
+              ? post.upvotedBy.filter(id => id !== userId)
+              : [...post.upvotedBy, userId]
+          };
+        }
+        return post;
+      })
+    );
   };
 
-  const addComment = async (postId: string, comment: Omit<Comment, 'id' | 'createdAt'>) => {
-    try {
-      const response = await apiAddComment(postId, comment.content);
-      if (response.success) {
-        setPosts(prevPosts =>
-          prevPosts.map(post => {
-            if (post.id === postId) {
-              const newComment: Comment = {
-                id: response.data?._id || `comment-${Date.now()}`,
-                userId: comment.userId,
-                userName: comment.userName,
-                userAvatar: comment.userAvatar,
-                content: comment.content,
-                createdAt: new Date()
-              };
-              return {
-                ...post,
-                comments: [...post.comments, newComment]
-              };
-            }
-            return post;
-          })
-        );
-      }
-    } catch (error) {
-      console.error('Error adding comment:', error);
-    }
-  };
+  const addComment = (postId: string, comment: Omit<Comment, 'id' | 'createdAt'>) => {
+    setPosts(prevPosts =>
+      prevPosts.map(post => {
+        if (post.id === postId) {
+          const newComment: Comment = {
+            id: `comment-${Date.now()}`,
+            userId: comment.userId,
+            userName: comment.userName,
+            userAvatar: comment.userAvatar,
+            content: comment.content,
+            createdAt: new Date()
+          };
+          return {
+            ...post,
+            comments: [...post.comments, newComment]
+          };
+        }
+        return post;
+      })
+    );
+  }
 
   const getUserPosts = (userId: string) => {
     // BACKEND API INTEGRATION POINT

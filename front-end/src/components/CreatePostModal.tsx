@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Image as ImageIcon, MapPin, Tag, Folder } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { usePosts } from '../contexts/PostsContext';
+import axios from 'axios';
 
 interface CreatePostModalProps {
   onClose: () => void;
@@ -21,6 +22,9 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
     isLocated: false
   });
   const [isLocating, setIsLocating] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualLat, setManualLat] = useState('');
+  const [manualLng, setManualLng] = useState('');
 
   const categories = [
     {
@@ -73,33 +77,99 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
     }
 
     setIsLocating(true);
+    
     try { 
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject);
+        navigator.geolocation.getCurrentPosition(
+          resolve, 
+          (error) => {
+            let errorMessage = 'Unable to retrieve your location';
+            
+            switch(error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage = 'Location access was denied. Please enable location services and try again.';
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage = 'Location information is unavailable. Please check your connection and try again.';
+                break;
+              case error.TIMEOUT:
+                errorMessage = 'The request to get your location timed out. Please try again.';
+                break;
+              default:
+                errorMessage = `An unknown error occurred: ${error.message}`;
+            }
+            
+            console.error('Geolocation error:', error);
+            reject(new Error(errorMessage));
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 15000, // 15 seconds
+            maximumAge: 0 // Force fresh location
+          }
+        );
       });
 
       const { latitude, longitude } = position.coords;
       
       // Get address from coordinates using reverse geocoding
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
-      );
-      const data = await response.json();
-      
-      const address = data.display_name || 'Current Location';
-      
-      setLocation({
-        address: address,
-        latitude: latitude,
-        longitude: longitude,
-        isLocated: true
-      });
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
+        );
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch address');
+        }
+        
+        const data = await response.json();
+        const address = data.display_name || 'Current Location';
+        
+        setLocation({
+          address: address,
+          latitude: latitude,
+          longitude: longitude,
+          isLocated: true
+        });
+      } catch (error) {
+        // If address lookup fails, still use the coordinates
+        console.warn('Error getting address, using coordinates only:', error);
+        setLocation({
+          address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+          latitude: latitude,
+          longitude: longitude,
+          isLocated: true
+        });
+      }
     } catch (error) {
       console.error('Error getting location:', error);
-      alert('Unable to retrieve your location. Please check your browser permissions.');
+      alert(error instanceof Error ? error.message : 'Unable to retrieve your location. Please check your browser permissions.');
     } finally {
       setIsLocating(false);
     }
+  };
+
+  const handleManualLocationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const lat = parseFloat(manualLat);
+    const lng = parseFloat(manualLng);
+
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      alert('Please enter valid coordinates (Latitude: -90 to 90, Longitude: -180 to 180)');
+      return;
+    }
+
+    setLocation({
+      address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      latitude: lat,
+      longitude: lng,
+      isLocated: true
+    });
+
+    // Close the manual input section
+    setShowManualInput(false);
+    setManualLat('');
+    setManualLng('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,6 +208,32 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
       
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create post');
+      }
+
+      // Submit to our backend API which will forward to the external service
+      const userEmail = localStorage.getItem('userEmail');
+      if (!userEmail) {
+        throw new Error('User email not found. Please log in again.');
+      }
+
+      // Call our backend endpoint which will handle the external API call
+      const complaintResponse = await fetch('http://localhost:5000/api/external/submit-complaint', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          description,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          citizen_email: userEmail
+        })
+      });
+
+      if (!complaintResponse.ok) {
+        const errorData = await complaintResponse.json();
+        throw new Error(errorData.error || 'Failed to submit complaint');
       }
 
       // Refresh posts and close modal
@@ -271,6 +367,68 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
                   </>
                 )}
               </button>
+            </div>
+            
+            <div className="mt-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setShowManualInput(!showManualInput)}
+                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+              >
+                {showManualInput ? 'Hide manual input' : 'Enter coordinates manually'}
+              </button>
+
+              {showManualInput && (
+                <form onSubmit={handleManualLocationSubmit} className="mt-2 space-y-2">
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="number"
+                        step="any"
+                        value={manualLat}
+                        onChange={(e) => setManualLat(e.target.value)}
+                        placeholder="Latitude (-90 to 90)"
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs"
+                        min="-90"
+                        max="90"
+                        required
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        type="number"
+                        step="any"
+                        value={manualLng}
+                        onChange={(e) => setManualLng(e.target.value)}
+                        placeholder="Longitude (-180 to 180)"
+                        className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-xs"
+                        min="-180"
+                        max="180"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowManualInput(false);
+                        setManualLat('');
+                        setManualLng('');
+                      }}
+                      className="px-2 py-1 text-xs text-gray-300 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-500"
+                    >
+                      Use Coordinates
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
             
             <div className="space-y-2">
