@@ -12,7 +12,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info', options: ToastOptions = {}) => {
     const toastOptions: ToastOptions = {
       position: 'top-right', 
-      autoClose: 10000, // Increased from 5000ms to 10000ms (10 seconds)
+      autoClose: 3000, //timer only 3 seconds for toaster
       hideProgressBar: false,
       closeOnClick: true,
       pauseOnHover: true,

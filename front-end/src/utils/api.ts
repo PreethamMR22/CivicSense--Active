@@ -7,6 +7,7 @@ export interface ApiResponse<T = any> {
   message?: string;
   user?: any;
   token?: string;
+  status?: number;
 }
 
 export async function apiRequest<T = any>(
@@ -48,11 +49,15 @@ export async function apiRequest<T = any>(
     console.log(`Making ${method} request to ${url}`, { data });
     const response = await fetch(url, config);
     
-    // Handle 401 Unauthorized
+    // Handle 401 Unauthorized - Let the calling component handle the redirect
     if (response.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
-      throw new Error('Session expired. Please log in again.');
+      // Return a structured error response instead of redirecting
+      return {
+        success: false,
+        error: 'Invalid credentials. Please check your email and password.',
+        status: 401
+      };
     }
     
     // Parse response data

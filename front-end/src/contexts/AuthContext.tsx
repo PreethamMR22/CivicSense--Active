@@ -63,6 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.success) {
         const errorMessage = response.error || 'Login failed';
         showToast(errorMessage, 'error');
+        
+        // If it's a 401 error (invalid credentials), don't throw an error
+        if (response.status === 401) {
+          return Promise.reject(new Error(errorMessage));
+        }
+        
         throw new Error(errorMessage);
       }
 
