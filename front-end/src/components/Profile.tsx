@@ -230,9 +230,7 @@ export default function Profile() {
       )}
       
       {/* Create Post Modal */}
-      {showCreatePostModal && (
-        <CreatePostModal onClose={() => setShowCreatePostModal(false)} />
-      )}
+      <CreatePostModal isOpen={showCreatePostModal} onClose={() => setShowCreatePostModal(false)} />
     </div>
   );
 }

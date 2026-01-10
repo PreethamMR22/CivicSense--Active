@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Image as ImageIcon, MapPin, Tag, Folder, Sparkles } from 'lucide-react';
+import LoadingModal from './LoadingModal';
 import { useAuth } from '../contexts/AuthContext';
 import { usePosts } from '../contexts/PostsContext';
 import { categorizePost } from '../utils/gemini';
@@ -27,6 +28,7 @@ export default function CreatePostModal({ isOpen, onClose }: CreatePostModalProp
   const [manualLat, setManualLat] = useState('');
   const [manualLng, setManualLng] = useState('');
   const [isCategorizing, setIsCategorizing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categories = [
     {
@@ -209,7 +211,7 @@ export default function CreatePostModal({ isOpen, onClose }: CreatePostModalProp
     if (!user) return;
 
     try {
-      const formData = new FormData();
+       const formData = new FormData();
       
       // Add text fields
       formData.append('userId', user._id);
@@ -243,6 +245,9 @@ export default function CreatePostModal({ isOpen, onClose }: CreatePostModalProp
       }
 
       // Submit to our backend API which will forward to the external service
+      setIsSubmitting(true);
+      
+      // First submit to our backend API which will forward to the external service
       const userEmail = localStorage.getItem('userEmail');
       if (!userEmail) {
         throw new Error('User email not found. Please log in again.');
@@ -268,10 +273,7 @@ export default function CreatePostModal({ isOpen, onClose }: CreatePostModalProp
         throw new Error(errorData.error || 'Failed to submit complaint');
       }
 
-      // Refresh posts and close modal
-      if (addPost) {
-        await addPost(data.data);
-      }
+      // Close the modal on success
       onClose();
     } catch (error: unknown) {
       console.error('Failed to create post:', error);
@@ -333,7 +335,7 @@ export default function CreatePostModal({ isOpen, onClose }: CreatePostModalProp
                 <Folder className="w-4 h-4 text-gray-500" />
                 Category *
               </label>
-              <button
+<button
                 type="button"
                 onClick={handleAutoCategorize}
                 disabled={isCategorizing || !description.trim()}
@@ -343,8 +345,8 @@ export default function CreatePostModal({ isOpen, onClose }: CreatePostModalProp
                     : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                {isCategorizing ? 'Categorizing...' : 'Auto Categorize'}
+                <Sparkles className={`w-3.5 h-3.5 ${isCategorizing ? 'opacity-50' : ''}`} />
+                {isCategorizing ? 'Analyzing...' : 'Auto Categorize'}
               </button>
             </div>
             <div className="relative">
@@ -603,6 +605,11 @@ export default function CreatePostModal({ isOpen, onClose }: CreatePostModalProp
           </div>
         </form>
       </div>
+      
+<LoadingModal 
+        isOpen={isSubmitting || isCategorizing} 
+        animationType={isCategorizing ? 'categorize' : 'submit'}
+      />
     </div>
   );
 }

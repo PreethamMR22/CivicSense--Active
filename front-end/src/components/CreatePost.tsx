@@ -26,9 +26,7 @@ export const CreatePost = () => {
         </div>
       </div>
       
-      {isModalOpen && (
-        <CreatePostModal onClose={() => setIsModalOpen(false)} />
-      )}
+      <CreatePostModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </>
   );
 };
