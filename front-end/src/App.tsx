@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { PostsProvider } from './contexts/PostsContext';
 import Login from './components/Login';
 import Signup from './components/Signup';
@@ -11,13 +12,15 @@ import Sidebar from './components/Sidebar';
 import CreatePostModal from './components/CreatePostModal';
 import Map from './components/Map';
 import { Home, MapPin, User } from 'lucide-react';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
+// Main app content with toast notifications
 function AppContent() {
   const { isAuthenticated, loading, user } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const location = useLocation();
   const isMapRoute = location.pathname === '/map';
-  const isAuthRoute = location.pathname === '/login' || location.pathname === '/signup';
 
   if (loading) {
     return (
@@ -51,7 +54,7 @@ function AppContent() {
           {/* Sidebar - Hidden on mobile, shown on md screens and up */}
           {isAuthenticated && !isMapRoute && (
             <div className="hidden md:block w-64 flex-shrink-0 sticky top-16 self-start">
-              <Sidebar navigation={navigation} user={user} />
+              <Sidebar navigation={navigation} user={user || undefined} />
             </div>
           )}
           
@@ -66,7 +69,10 @@ function AppContent() {
                       <Feed />
                     </div>
                     {showCreateModal && (
-                      <CreatePostModal onClose={() => setShowCreateModal(false)} />
+                      <CreatePostModal 
+                        isOpen={showCreateModal}
+                        onClose={() => setShowCreateModal(false)} 
+                      />
                     )}
                   </ProtectedRoute>
                 }
@@ -90,7 +96,10 @@ function AppContent() {
                         <Profile />
                       </div>
                       {showCreateModal && (
-                        <CreatePostModal onClose={() => setShowCreateModal(false)} />
+                        <CreatePostModal 
+                          isOpen={showCreateModal}
+                          onClose={() => setShowCreateModal(false)} 
+                        />
                       )}
                     </div>
                   </ProtectedRoute>
@@ -157,14 +166,17 @@ function AppContent() {
   );
 }
 
-const App: React.FC = () => {
+const App = () => {
   return (
     <Router>
-      <AuthProvider>
-        <PostsProvider>
-          <AppContent />
-        </PostsProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <PostsProvider>
+            <AppContent />
+            <ToastContainer />
+          </PostsProvider>
+        </AuthProvider>
+      </ToastProvider>
     </Router>
   );
 };

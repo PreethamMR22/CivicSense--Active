@@ -1,6 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const GEMINI_API_KEY = 'AIzaSyBfRyiQLBZHRvGPFBD7atjsnNxUTtQ8uXI';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+  throw new Error('VITE_GEMINI_API_KEY is not defined in environment variables');
+}
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 export async function categorizePost(description: string): Promise<string> {

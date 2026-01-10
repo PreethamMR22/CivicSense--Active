@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import { apiRequest } from '../utils/api';
+import { useToast } from './ToastContext';
 
 interface AuthContextType {
   user: User | null;
@@ -49,6 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  const { showToast } = useToast();
+
   const login = async (email: string, password: string): Promise<User> => {
     setLoading(true);
     try {
@@ -58,13 +61,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, false);
 
       if (!response.success) {
-        throw new Error(response.error || 'Login failed');
+        const errorMessage = response.error || 'Login failed';
+        showToast(errorMessage, 'error');
+        throw new Error(errorMessage);
       }
 
       const { token, user } = response;
       
       if (!token || !user) {
-        throw new Error('Invalid response from server');
+        const errorMessage = 'Invalid response from server';
+        showToast(errorMessage, 'error');
+        throw new Error(errorMessage);
       }
       
       // Store token and user data in localStorage
@@ -83,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(userData);
       setIsAuthenticated(true);
       
+      showToast('Successfully logged in!', 'success');
       return userData;
     } catch (error) {
       console.error('Login error:', error);
@@ -91,6 +99,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('userEmail');
       setUser(null);
       setIsAuthenticated(false);
+      
+      // Show error toast if it's not a validation error (those are shown above)
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      if (!errorMessage.includes('Login failed') && !errorMessage.includes('Invalid response')) {
+        showToast('An error occurred during login. Please try again.', 'error');
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -108,29 +122,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, false);
 
       if (!response.success) {
-        throw new Error(response.error || 'Registration failed');
+        const errorMessage = response.error || 'Registration failed';
+        showToast(errorMessage, 'error');
+        throw new Error(errorMessage);
       }
 
       const { token, user } = response;
       
       if (!token || !user) {
-        throw new Error('Invalid response from server');
+        const errorMessage = 'Invalid response from server';
+        showToast(errorMessage, 'error');
+        throw new Error(errorMessage);
       }
       
       // Store token in localStorage
       localStorage.setItem('token', token);
       
       // Set user in state and mark as authenticated
-      setUser({
+      const userData = {
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`
-      });
+      };
       
+      setUser(userData);
       setIsAuthenticated(true);
-      return user;
+      
+      showToast('Account created successfully!', 'success');
+      return userData;
     } catch (error) {
       console.error('Signup error:', error);
       // Clear all auth-related data from localStorage
@@ -138,6 +159,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('userEmail');
       setUser(null);
       setIsAuthenticated(false);
+      
+      // Show error toast if it's not a validation error (those are shown above)
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+      if (!errorMessage.includes('Registration failed') && !errorMessage.includes('Invalid response')) {
+        showToast('An error occurred during registration. Please try again.', 'error');
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -147,8 +174,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await apiRequest('/auth/logout', 'GET');
+      showToast('Successfully logged out', 'success');
     } catch (error) {
       console.error('Logout error:', error);
+      showToast('An error occurred during logout', 'error');
     } finally {
       // Clear user data and authentication state
       // Clear all auth-related data from localStorage
@@ -242,12 +271,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
+};
