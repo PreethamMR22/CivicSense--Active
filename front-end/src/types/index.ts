@@ -1,12 +1,12 @@
 export interface User {
-  id: string;
+  _id: string;
   email: string;
   name: string;
   avatar?: string;
 }
 
 export interface Comment {
-  id: string;
+  _id: string;
   userId: string;
   userName: string;
   userAvatar?: string;
@@ -20,7 +20,7 @@ export interface Coordinates {
 }
 
 export interface Post {
-  id: string;
+  _id: string;
   userId: string;
   userName: string;
   userAvatar?: string;

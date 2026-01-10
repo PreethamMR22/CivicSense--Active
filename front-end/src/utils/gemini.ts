@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const GEMINI_API_KEY = 'AIzaSyC6D7ZKbwI2vm5-6KpuUdmSgSbirZ-qlbQ';
+const GEMINI_API_KEY = 'AIzaSyBfRyiQLBZHRvGPFBD7atjsnNxUTtQ8uXI';
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 export async function categorizePost(description: string): Promise<string> {

@@ -5,10 +5,11 @@ import { usePosts } from '../contexts/PostsContext';
 import { categorizePost } from '../utils/gemini';
 
 interface CreatePostModalProps {
+  isOpen: boolean;
   onClose: () => void;
 }
 
-export default function CreatePostModal({ onClose }: CreatePostModalProps) {
+export default function CreatePostModal({ isOpen, onClose }: CreatePostModalProps) {
   const { user } = useAuth();
   const { addPost } = usePosts();
   const [description, setDescription] = useState('');
@@ -113,14 +114,26 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
 
       const { latitude, longitude } = position.coords;
       
-      // Get address from coordinates using reverse geocoding
+      // Get address from coordinates using reverse geocoding with rate limiting
       try {
+        // Add a small delay to respect rate limits (max 1 request per second)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'CivicSense/1.0 (your-email@example.com)' // Replace with your app's name and contact email
+            }
+          }
         );
         
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Please try again in a few seconds.');
+        }
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch address');
+          throw new Error(`Failed to fetch address: ${response.status} ${response.statusText}`);
         }
         
         const data = await response.json();
@@ -279,42 +292,58 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-2xl bg-gray-900 rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-gray-900 border-b border-gray-800 p-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Create Complaint</h2>
+      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between z-10">
+          <div className="flex items-center">
+            <h2 className="text-xl font-semibold text-gray-900">Create Complaint</h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-800 rounded-full transition-colors"
+            className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
           >
-            <X className="w-6 h-6 text-gray-400" />
+            <X className="w-5 h-5 text-gray-500" />
           </button>
+        </div>
+        
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold">
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium text-gray-900">{user?.name || 'User'}</h3>
+              <p className="text-xs text-gray-500">Posting as yourself</p>
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
-                <Folder className="w-4 h-4" />
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <Folder className="w-4 h-4 text-gray-500" />
                 Category *
               </label>
               <button
                 type="button"
                 onClick={handleAutoCategorize}
                 disabled={isCategorizing || !description.trim()}
-                className={`flex items-center gap-1 px-3 py-1 text-xs rounded-md transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all ${
                   isCategorizing || !description.trim()
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                 }`}
               >
-                <Sparkles className="w-3 h-3" />
+                <Sparkles className="w-3.5 h-3.5" />
                 {isCategorizing ? 'Categorizing...' : 'Auto Categorize'}
               </button>
             </div>
@@ -322,7 +351,7 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-colors"
                 required
               >
                 <option value="">Select a category</option>
@@ -357,31 +386,36 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
               Description *
             </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              rows={4}
-              placeholder="Describe the issue..."
-              required
-            />
+            <div className="relative">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors"
+                rows={4}
+                placeholder="Describe the issue in detail..."
+                required
+              />
+              <div className="absolute bottom-2 right-2 text-xs text-gray-500">
+                {description.length}/1000
+              </div>
+            </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
-                <MapPin className="w-4 h-4" />
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <MapPin className="w-4 h-4 text-gray-500" />
                 Location
               </label>
               <button
                 type="button"
                 onClick={getCurrentLocation}
                 disabled={isLocating}
-                className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-blue-100"
               >
                 {isLocating ? (
                   <>
@@ -470,7 +504,7 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
                 type="text"
                 value={location.address}
                 onChange={(e) => setLocation(prev => ({ ...prev, address: e.target.value }))}
-                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                 placeholder="e.g., Main Street, Downtown"
               />
               {location.isLocated && (
@@ -488,34 +522,34 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
           </div>
 
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
-              <Tag className="w-4 h-4" />
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+              <Tag className="w-4 h-4 text-gray-500" />
               Tags
             </label>
             <input
               type="text"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="e.g., safety, urgent (comma separated)"
+              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              placeholder="e.g., safety, urgent (comma separated, max 5 tags)"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-300">
+            <label className="block text-sm font-medium text-gray-700">
               Add Image (Optional)
             </label>
             <div className="flex items-center justify-center w-full">
               <label
                 htmlFor="image-upload"
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-800 border-gray-700 hover:bg-gray-800/50 transition-colors"
+                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 border-gray-300 hover:bg-gray-100 transition-colors relative"
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <ImageIcon className="w-8 h-8 mb-2 text-gray-400" />
-                  <p className="text-sm text-gray-400">
-                    <span className="text-blue-500 hover:underline">Click to upload</span> or drag and drop
+                  <p className="text-sm text-gray-600">
+                    <span className="text-blue-600 hover:underline">Click to upload</span> or drag and drop
                   </p>
-                  <p className="text-xs text-gray-500">PNG, JPG, GIF (max. 5MB)</p>
+                  <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF (max. 5MB)</p>
                 </div>
                 <input
                   id="image-upload"
@@ -531,7 +565,7 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
                 <img
                   src={imagePreview}
                   alt="Preview"
-                  className="w-full max-h-48 rounded-lg object-cover"
+                  className="w-full max-h-48 rounded-lg object-cover border border-gray-200"
                 />
                 <button
                   type="button"
@@ -549,19 +583,22 @@ export default function CreatePostModal({ onClose }: CreatePostModalProps) {
             )}
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-4 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 bg-gray-800 text-white font-semibold rounded-xl hover:bg-gray-700 transition-colors"
+              className="flex-1 py-2.5 bg-white text-gray-700 font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300"
+              className="flex-1 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
             >
-              Post Complaint
+              <span>Post Complaint</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
             </button>
           </div>
         </form>
